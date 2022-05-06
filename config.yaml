@@ -1,0 +1,26 @@
+# Configuration Data
+sampleRate: 50  #Hz
+
+enableKafkaStreaming: false
+enableMongoStreaming: false
+enableInfluxStreaming: true
+
+gameDataPort: 5300
+
+# mongo Settings
+mongouri: mongodb://localhost:27017
+database: telemetry
+collection: gamedata
+
+# Influx Settings
+influxHost: http://localhost:8086
+token: hrMruMz6C2QZprXh5fYUsOLW6FxaZkDNF_dJG6Ssmh-20ac9v80dDScou27o9__XXE6VqTP28rfTQx27mlZQsw==
+bucket: telemetry
+org: ctl
+
+
+# Kafka Settings
+kafkaServer: 172.23.139.89:9092
+topic: telemetry
+
+verbose: false
