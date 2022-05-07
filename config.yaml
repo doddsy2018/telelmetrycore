@@ -23,4 +23,7 @@ org: ctl
 kafkaServer: 172.23.139.89:9092
 topic: telemetry
 
+# Map Streaming
+mapUrl: http://localhost:1130/set_map
+
 verbose: false

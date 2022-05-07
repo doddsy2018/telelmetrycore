@@ -21,6 +21,7 @@ using InfluxDB.Client.Core;
 using InfluxDB.Client.Writes;
 using System.Diagnostics;
 using System.Threading;
+using System.Net.Http;
 
 namespace TelemetryCore
 {
@@ -43,6 +44,8 @@ namespace TelemetryCore
         private static bool streamToMongo = false;
         private static bool streamToConsole = false;
         private static bool streamToInflux = false;
+        private static bool streamToMap = false;
+
 
         private static bool isRaceOn = false;
         private static DataPacket data = new DataPacket();
@@ -406,6 +409,44 @@ namespace TelemetryCore
             });
             #endregion
 
+            #region map streamer
+            var mapStreamerTask = Task.Run(async () =>
+            {
+                // initiate previous values
+                double px = 0;
+                double py = 0;
+                HttpClient client = new HttpClient();
+
+                while (true)
+                {
+                    if (isRaceOn && streamToMap)
+                    {
+                        var msg = new MapMessage();
+                        msg.x = data.PositionX;
+                        msg.y = data.PositionZ;
+                        msg.z = data.PositionY;
+                        msg.s = data.Speed;
+
+                        // Compute orientation
+                        var scaleFactor = 1000;
+                        var bearing = GetBearing(py / scaleFactor, px / scaleFactor, msg.y / scaleFactor, msg.x / scaleFactor);
+                        msg.d = bearing;
+
+                        //Cache previous location
+                        px = msg.x;
+                        py = msg.y;
+
+                        var msgString = $"id={msg.id}&z={msg.z}&x={msg.x}&y={msg.y}&d={msg.d}&s={msg.s}";
+                        var url = $"{appConfig.mapUrl}?{msgString}";
+                        HttpResponseMessage response = await client.GetAsync(url).ConfigureAwait(false);
+
+                        recordDelay(100);
+                    }
+                }
+            });
+            #endregion          
+            
+            
             #region AppControls
             Console.WriteLine("Press S to stop");
             Console.WriteLine("Press Q to display current recorder states");
@@ -413,8 +454,10 @@ namespace TelemetryCore
             Console.WriteLine("Press M to toggle Mongo Output");
             Console.WriteLine("Press I to toggle Influx Output");
             Console.WriteLine("Press K to toggle Kafka Output");
+            Console.WriteLine("Press G to toggle Map Stream Output");
 
-            while (!Console.KeyAvailable)
+            bool runKeyLoop = true;
+            while (runKeyLoop)
             {
                 string command=Console.ReadKey(true).Key.ToString();
                 if (command == "R")
@@ -493,10 +536,6 @@ namespace TelemetryCore
                     }
                 }
 
-
-
-
-
                 if (command == "C")
                 {
                     if (streamToConsole)
@@ -511,9 +550,23 @@ namespace TelemetryCore
                     }
                 }
 
+                if (command == "G")
+                {
+                    if (streamToMap)
+                    {
+                        streamToMap = false;
+                        Console.WriteLine("Stream to Map stopped");
+                    }
+                    else
+                    {
+                        streamToMap = true;
+                        Console.WriteLine("Stream to Map started");
+                    }
+                }
+
                 if (command == "S")
                 {
-                    break;
+                    runKeyLoop = false;
                 }
 
 
@@ -525,13 +578,15 @@ namespace TelemetryCore
                         $"enableInfluxStreaming: {enableInfluxStreaming}\n");
 
                     Console.WriteLine($"streamToConsole: {streamToConsole}\n" +
-                        $"recordingData: {recordingData}\n" +
+                        $"csvrecordingData: {recordingData}\n" +
                         $"streamToKafka: {streamToKafka}\n" +
                         $"streamToMongo: {streamToMongo}\n" +
-                        $"streamToMongo: {streamToInflux}\n");
+                        $"streamToMongo: {streamToInflux}\n" +
+                        $"streamToMap: {streamToMap}\n");
                 }
             }
-
+            Console.WriteLine("\n*** Telemetry Core Shutting Down ***");
+            Environment.Exit(0);
             #endregion
 
         }
@@ -727,17 +782,6 @@ namespace TelemetryCore
             }
         }
 
-        // To Be Removed
-        static async Task<Task> writeStringToInflux(string theString)
-        {
-            using (var writeApi = influxClient.GetWriteApi())
-            {
-                writeApi.WriteRecord(theString, WritePrecision.Ns, bucket, org);
-            }
-            await Task.Delay(0);  // dummy await
-            return Task.CompletedTask;
-        }
-
         public static void DisplayTimerProperties()
         {
             // Display the timer frequency and resolution.
@@ -757,6 +801,51 @@ namespace TelemetryCore
             Console.WriteLine("  Timer is accurate within {0} nanoseconds",
                 nanosecPerTick);
         }
+
+
+        private static double GetBearing(double pa0, double pa1, double pb0, double pb1)
+        {
+            /*
+             # CONVERTED FROM PYTHON
+             Calculates the bearing between two points.
+            The formulae used is the following:
+                θ = atan2(sin(Δlong).cos(lat2),
+                          cos(lat1).sin(lat2) − sin(lat1).cos(lat2).cos(Δlong))
+            :Parameters:
+              - `pointA: The tuple representing the latitude/longitude for the
+                first point. Latitude and longitude must be in decimal degrees
+              - `pointB: The tuple representing the latitude/longitude for the
+                second point. Latitude and longitude must be in decimal degrees
+            :Returns:
+              The bearing in degrees
+            :Returns Type:
+              float
+            */
+            
+            var lat1 = ConvertDegreesToRadians(pa0);
+            var lat2 = ConvertDegreesToRadians(pb0);
+            var diffLong = ConvertDegreesToRadians(pb1 - pa1);
+            var x = Math.Sin(diffLong) * Math.Cos(lat2);
+            var y = Math.Cos(lat1) * Math.Sin(lat2) - (Math.Sin(lat1)* Math.Cos(lat2) * Math.Cos(diffLong));
+            var initial_bearing = Math.Atan2(x, y);
+
+            // Now we have the initial bearing but math.atan2 return values
+            // from -180° to + 180° which is not what we want for a compass bearing
+            // The solution is to normalize the initial bearing as shown below
+            initial_bearing = ConvertRadiansToDegrees(initial_bearing);
+            var compass_bearing = (initial_bearing + 360) % 360;
+            return (ConvertDegreesToRadians(compass_bearing));
+        }
+        public static double ConvertDegreesToRadians(double angle)
+        {
+            return Math.PI * angle / 180.0;
+        }
+
+        public static double ConvertRadiansToDegrees(double angle)
+        {
+            return 180.0 * angle / Math.PI;
+        }
+
 
         static void showSplash()
         {

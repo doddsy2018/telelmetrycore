@@ -16,6 +16,7 @@ Core telemetry tool that processes Forza 5 game telemetry data and streams it ou
 - MongoDB (Timeseries Collection)
 - InfluxDB
 - Kafka
+- Map Stream - Interfce with Forza Map Service
 
 ## Usage
 The application is a console app and responds to the follow key commands
@@ -26,6 +27,7 @@ The application is a console app and responds to the follow key commands
 - Press `M` to toggle Mongo Output
 - Press `I` to toggle Influx Output
 - Press `K` to toggle Kafka Output
+- Press `G` to toggle Map Stream Output
 
 ## Configuration
 
@@ -56,8 +58,17 @@ org: ctl
 kafkaServer: 172.23.139.89:9092
 topic: telemetry
 
+# Map Streaming
+mapUrl: http://localhost:1130/set_map
+
 verbose: false
 ```
+
+In Forza 5 go to `SETTINGS` -> `HUD AND GAMEPLY`
+
+Edit `DATA OUT IP ADDRESS` and `DATA OUT IP PORT` to the machine IP and port running Telemetry Core
+
+<img src="images/settings.png" width=650 align=center>
 
 ## References
 

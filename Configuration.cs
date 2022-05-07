@@ -27,6 +27,8 @@ namespace TelemetryCore
         public string kafkaServer { get; set; } = "localhost:9092";
         public string topic { get; set; } = "gameTelemetry";
 
+
+        public string mapUrl { get; set; } = "http://localhost";
         public bool verbose { get; set; } = true;
     }
  }
