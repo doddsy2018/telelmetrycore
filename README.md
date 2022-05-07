@@ -64,7 +64,7 @@ mapUrl: http://localhost:1130/set_map
 verbose: false
 ```
 
-In Forza 5 go to `SETTINGS` -> `HUD AND GAMEPLY`
+In Forza 5 go to `SETTINGS` -> `HUD AND GAMEPLAY`
 
 Edit `DATA OUT IP ADDRESS` and `DATA OUT IP PORT` to the machine IP and port running Telemetry Core
 
